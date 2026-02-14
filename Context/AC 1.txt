@@ -1,0 +1,36 @@
+As a system,
+I want to scan all local images and compute stable content hashes,
+So that local files can be used as the source of truth for comparison.
+
+Acceptance Criteria
+Functional
+
+System scans local directories recursively
+
+Only supported image formats are processed (jpg, png, jpeg, heic, webp)
+
+Each file produces:
+
+file path
+
+size (bytes)
+
+hash (MD5 or SHA-256)
+
+Hashing is performed using streaming (chunk-based) IO
+
+Hashes are cached to avoid reprocessing unchanged files
+
+Non-Functional
+
+No file is fully loaded into memory
+
+System handles ≥100 GB datasets without failure
+
+Hash computation is deterministic and repeatable
+
+SOLID Mapping
+
+SRP: LocalScanner + HashService
+
+DIP: Hash algorithm injected via interface

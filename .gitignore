@@ -1,0 +1,12 @@
+.gitignore
+Context/*
+Context/AC 1.txt
+# IDE files
+.idea/
+
+# Virtual environments
+.venv/
+
+# Python cache
+__pycache__/
+**/__pycache__/
