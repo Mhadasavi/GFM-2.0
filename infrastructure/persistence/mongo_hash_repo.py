@@ -3,12 +3,13 @@ from domain.models import FileRecord
 from domain.interfaces import HashRepositoryInterface
 
 class MongoHashRepository(HashRepositoryInterface):
-    def __init__(self, connection_string: str, db_name: str = 'gfm', collection_name: str = 'hashes'):
+    def __init__(self, connection_string: str, db_name: str = 'inventory', collection_name: str = 'local_files'):
         self.client = MongoClient(connection_string)
         self.db = self.client[db_name]
         self.collection = self.db[collection_name]
-        self.collection.create_index([('path', 1), ('last_modified', 1)], unique=True)
-        self.collection.create_index([('hash', 1)])
+        self.collection.create_index("path", unique=True)
+        self.collection.create_index([("size", 1), ("hash", 1)])
+        self.collection.create_index("hash")
 
     def upsert(self, record: FileRecord):
         # Convert FileRecord to dict for MongoDB
@@ -23,13 +24,13 @@ class MongoHashRepository(HashRepositoryInterface):
             'source': record.source
         }
         self.collection.update_one(
-            {'path': record.path, 'last_modified': record.last_modified},
+            {'path': record.path},
             {'$set': record_dict},
             upsert=True
         )
 
-    def get(self, file_path: str, last_modified: float) -> FileRecord:
-        doc = self.collection.find_one({'path': file_path, 'last_modified': last_modified})
+    def get(self, file_path: str) -> FileRecord:
+        doc = self.collection.find_one({'path': file_path})
         if doc:
             # Remove MongoDB's internal '_id' before creating the FileRecord
             doc.pop('_id', None)

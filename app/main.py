@@ -13,6 +13,8 @@ from infrastructure.drive.drive_scanner import DriveScanner
 from infrastructure.persistence.mongo_drive_repo import MongoDriveRepository
 from infrastructure.persistence.mongo_scan_state_repo import MongoScanStateRepository
 from services.drive_inventory_runner import DriveInventoryRunner
+from services.comparison_service import ComparisonService
+from services.duplicate_detection_runner import DuplicateDetectionRunner
 
 from utils.logging import get_logger
 
@@ -23,7 +25,7 @@ def run_local_inventory(config, logger):
     hash_repo = MongoHashRepository(
         connection_string=config.MONGO_CONNECTION_STRING,
         db_name=config.DB_NAME,
-        collection_name='file_hashes'
+        collection_name='local_files'
     )
     
     inventory_runner = InventoryRunner(
@@ -60,12 +62,29 @@ def run_drive_inventory(config, logger):
     runner = DriveInventoryRunner(scanner, drive_repo, state_repo)
     runner.run()
 
+def run_duplicate_detection(config, logger):
+    logger.info("Starting duplicate detection...")
+    client = MongoClient(config.MONGO_URI)
+    db = client[config.DB_NAME]
+
+    comparison_service = ComparisonService(
+        db["local_files"],
+        db["drive_files"]
+    )
+
+    runner = DuplicateDetectionRunner(
+        comparison_service,
+        db["duplicate_results"]
+    )
+
+    runner.run()
+
 def main():
     logger = get_logger(__name__)
     config = Config()
 
     if len(sys.argv) < 2:
-        print("Usage: python -m app.main [local|drive|all]")
+        print("Usage: python -m app.main [local|drive|compare|all]")
         return
 
     command = sys.argv[1].lower()
@@ -81,6 +100,12 @@ def main():
             run_drive_inventory(config, logger)
         except Exception as e:
             logger.error(f"Drive inventory failed: {e}", exc_info=True)
+
+    if command in ['compare', 'all']:
+        try:
+            run_duplicate_detection(config, logger)
+        except Exception as e:
+            logger.error(f"Duplicate detection failed: {e}", exc_info=True)
 
 if __name__ == "__main__":
     main()

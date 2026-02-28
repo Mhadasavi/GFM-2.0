@@ -40,8 +40,8 @@ class InventoryRunner:
         all_files = self.scanner.scan(dir_path)
         files_to_process = []
         for file in all_files:
-            cached_file = self.hash_repo.get(file.path, file.last_modified)
-            if not cached_file or not cached_file.hash:
+            cached_file = self.hash_repo.get(file.path)
+            if not cached_file or cached_file.last_modified != file.last_modified or not cached_file.hash:
                 files_to_process.append(file)
             else:
                 logger.debug(f"Cache hit for {file.path}. Skipping hashing.")
