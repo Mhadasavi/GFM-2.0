@@ -12,6 +12,7 @@ class MongoDriveRepository:
 
     def _ensure_indexes(self):
         self.collection.create_index("drive_file_id", unique=True)
+        self.collection.create_index([("size", 1), ("hash", 1)])
         self.collection.create_index("hash")
         self.collection.create_index("last_modified")
         self.collection.create_index("eligible_for_dedup")

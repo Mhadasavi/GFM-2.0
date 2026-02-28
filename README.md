@@ -12,8 +12,70 @@ A robust tool to synchronize, deduplicate, and manage files between local storag
 ## Prerequisites
 
 - **Python 3.8+**
-- **MongoDB:** A running instance (local or Atlas).
+- **Docker & Docker Compose:** For a production-like MongoDB setup.
 - **Google Cloud Project:** With Drive API enabled and OAuth 2.0 credentials.
+
+## MongoDB Setup
+
+GFM 2.0 uses a production-style MongoDB configuration with replica sets and authentication for high availability and performance.
+
+### 1. Initialize MongoDB with Docker
+
+Go to the `mongo-prod-setup` directory and start the container:
+
+```bash
+cd mongo-prod-setup
+docker-compose up -d
+```
+
+### 2. Initialize Replica Set and Admin User
+
+Enter the MongoDB container:
+
+```bash
+docker exec -it mongodb mongosh
+```
+
+Inside the `mongosh` prompt, initialize the replica set:
+
+```javascript
+rs.initiate()
+```
+
+Wait a few seconds for it to become Primary (check with `rs.status()`), then create the admin user:
+
+```javascript
+db.getSiblingDB("admin").createUser({
+  user: "admin",
+  pwd: "StrongPassword123!",
+  roles: [{ role: "root", db: "admin" }]
+})
+```
+
+### 3. Setup Database and Collections
+
+You can use the provided setup script to create collections and indexes automatically:
+
+```bash
+# From the project root
+python setup_mongo.py
+```
+
+Alternatively, you can manually set them up in `mongosh`:
+
+```javascript
+use inventory
+
+db.createCollection("local_files")
+db.createCollection("drive_files")
+db.createCollection("deletion_batches")
+
+// Critical indexes for scale
+db.local_files.createIndex({ size: 1, hash: 1 })
+db.drive_files.createIndex({ size: 1, hash: 1 })
+db.local_files.createIndex({ path: 1 }, { unique: true })
+db.drive_files.createIndex({ drive_file_id: 1 }, { unique: true })
+```
 
 ## Installation
 
@@ -43,8 +105,8 @@ The application is configured via environment variables. You can set these in yo
 
 | Variable | Description | Default |
 | :--- | :--- | :--- |
-| `MONGO_CONNECTION_STRING` | MongoDB connection URI | `mongodb://localhost:27017/` |
-| `DB_NAME` | Database name | `gfm_dev` |
+| `MONGO_CONNECTION_STRING` | MongoDB connection URI | `mongodb://admin:StrongPassword123!@localhost:27017/?authSource=admin&directConnection=true` |
+| `DB_NAME` | Database name | `inventory` |
 | `SCAN_DIRECTORY` | Local directory to scan | (Project root) |
 | `HASH_ALGO` | Hash algorithm for local files | `sha256` |
 | `MAX_WORKERS` | Parallel workers for hashing | `4` |

@@ -18,5 +18,5 @@ class HashRepositoryInterface(ABC):
         pass
 
     @abstractmethod
-    def get(self, file_path: str, last_modified: float) -> FileRecord:
+    def get(self, file_path: str) -> FileRecord:
         pass
