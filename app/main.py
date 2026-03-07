@@ -1,37 +1,34 @@
 import os
 import sys
 import logging
-from pymongo import MongoClient
 from app.config import Config
 from infrastructure.local.local_scanner import LocalScanner
+from infrastructure.normalization.local_normalizer import LocalNormalizer
 from services.hashing_service import HashingService
-from infrastructure.persistence.mongo_hash_repo import MongoHashRepository
+from infrastructure.persistence.sqlite_repo import SQLiteFileRepository
 from services.inventory_runner import InventoryRunner
 
 from infrastructure.drive.drive_client import DriveClient
 from infrastructure.drive.drive_scanner import DriveScanner
-from infrastructure.persistence.mongo_drive_repo import MongoDriveRepository
-from infrastructure.persistence.mongo_scan_state_repo import MongoScanStateRepository
+from infrastructure.normalization.drive_normalizer import DriveNormalizer
 from services.drive_inventory_runner import DriveInventoryRunner
-from services.comparison_service import ComparisonService
-from services.duplicate_detection_runner import DuplicateDetectionRunner
+# from services.comparison_service import ComparisonService # Needs refactoring for SQLite
+# from services.duplicate_detection_runner import DuplicateDetectionRunner
 
 from utils.logging import get_logger
 
 def run_local_inventory(config, logger):
     logger.info("Starting local inventory run...")
     scanner = LocalScanner()
+    normalizer = LocalNormalizer()
     hashing_service = HashingService(chunk_size=1024*1024)
-    hash_repo = MongoHashRepository(
-        connection_string=config.MONGO_CONNECTION_STRING,
-        db_name=config.DB_NAME,
-        collection_name='local_files'
-    )
+    file_repo = SQLiteFileRepository(config.SQLITE_DB_PATH)
     
     inventory_runner = InventoryRunner(
         scanner=scanner,
+        normalizer=normalizer,
         hashing_service=hashing_service,
-        hash_repo=hash_repo,
+        file_repo=file_repo,
         max_workers=config.MAX_WORKERS,
         hash_algo=config.HASH_ALGO
     )
@@ -45,39 +42,28 @@ def run_local_inventory(config, logger):
 
 def run_drive_inventory(config, logger):
     logger.info("Starting drive inventory run...")
-    client = MongoClient(config.MONGO_URI)
-    db = client[config.DB_NAME]
-
-    state_repo = MongoScanStateRepository(db)
-    last_scan = state_repo.get_last_scan_time("drive")
+    file_repo = SQLiteFileRepository(config.SQLITE_DB_PATH)
 
     drive_client = DriveClient(
         credentials_path=config.CREDENTIALS_PATH,
         token_path=config.TOKEN_PATH
     )
 
-    scanner = DriveScanner(drive_client, last_scan)
-    drive_repo = MongoDriveRepository(db)
+    scanner = DriveScanner(drive_client)
+    normalizer = DriveNormalizer()
 
-    runner = DriveInventoryRunner(scanner, drive_repo, state_repo)
+    runner = DriveInventoryRunner(scanner, normalizer, file_repo)
     runner.run()
 
 def run_duplicate_detection(config, logger):
-    logger.info("Starting duplicate detection...")
-    client = MongoClient(config.MONGO_URI)
-    db = client[config.DB_NAME]
-
-    comparison_service = ComparisonService(
-        db["local_files"],
-        db["drive_files"]
-    )
-
-    runner = DuplicateDetectionRunner(
-        comparison_service,
-        db["duplicate_results"]
-    )
-
-    runner.run()
+    logger.info("Starting duplicate detection (SQLite)...")
+    file_repo = SQLiteFileRepository(config.SQLITE_DB_PATH)
+    duplicates = file_repo.find_duplicates_by_hash()
+    
+    logger.info(f"Found {len(duplicates)} duplicate records across all sources.")
+    # For now, just log some info. In a full implementation, we'd output to CSV/Excel as per AC.
+    for record in duplicates[:10]: # Log first 10
+        logger.info(f"Duplicate: {record.name} ({record.source_id}) - Hash: {record.hash}")
 
 def main():
     logger = get_logger(__name__)
