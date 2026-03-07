@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import List
+from typing import List, Dict, Any, Generator
 from domain.models import FileRecord
 
 class HashingServiceInterface(ABC):
@@ -7,16 +7,25 @@ class HashingServiceInterface(ABC):
     def stream_hash(self, file_path: str, algorithm: str = 'sha256') -> str:
         pass
 
-class ScannerInterface(ABC):
+class NormalizerInterface(ABC):
     @abstractmethod
-    def scan(self, dir_path: str) -> List[FileRecord]:
+    def normalize(self, raw_data: Any) -> FileRecord:
         pass
 
-class HashRepositoryInterface(ABC):
+class ScannerInterface(ABC):
+    @abstractmethod
+    def scan(self, source_path: str) -> Generator[Any, None, None]:
+        pass
+
+class FileRepositoryInterface(ABC):
     @abstractmethod
     def upsert(self, record: FileRecord):
         pass
 
     @abstractmethod
-    def get(self, file_path: str) -> FileRecord:
+    def get_by_source_id(self, source_id: str) -> FileRecord:
+        pass
+
+    @abstractmethod
+    def find_duplicates_by_hash(self) -> List[FileRecord]:
         pass
