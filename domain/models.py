@@ -3,11 +3,11 @@ from typing import Optional
 
 @dataclass(frozen=True)
 class FileRecord:
-    path: str
+    source_id: str  # Path for local, Drive ID for drive
     name: str
-    extension: str
     size: int
-    last_modified: float
-    hash: Optional[str]
-    hash_algo: str
-    source: str = "local"  # or "drive"
+    source: str  # 'local' or 'drive'
+    hash: Optional[str] = None
+    hash_algo: Optional[str] = None
+    extension: Optional[str] = None
+    last_modified: Optional[float] = None
