@@ -11,3 +11,4 @@ class FileRecord:
     hash_algo: Optional[str] = None
     extension: Optional[str] = None
     last_modified: Optional[float] = None
+    status: Optional[str] = None  # 'DUPLICATE', 'UNIQUE', 'UNVERIFIED'
