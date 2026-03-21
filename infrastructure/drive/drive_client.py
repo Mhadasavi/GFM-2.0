@@ -49,7 +49,10 @@ class DriveClient:
         page_size: int = 1000,
     ) -> Generator[Dict[str, Any], None, None]:
 
-        fields = fields or "nextPageToken, files(id,name,mimeType,md5Checksum,size,modifiedTime,parents)"
+        fields = (
+            fields
+            or "nextPageToken, files(id,name,mimeType,md5Checksum,size,modifiedTime,parents)"
+        )
 
         page_token = None
 
@@ -75,8 +78,7 @@ class DriveClient:
                     break
 
             except HttpError as error:
-                logger.error(json.dumps({
-                    "event": "drive_api_error",
-                    "error": str(error)
-                }))
+                logger.error(
+                    json.dumps({"event": "drive_api_error", "error": str(error)})
+                )
                 raise

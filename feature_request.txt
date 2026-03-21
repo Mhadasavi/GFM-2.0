@@ -1,7 +1,22 @@
-1. Add pre-commit
+1. Add pre-commit - Done
 2. Implement elapsed time
 3. log start and end time
 4. Implement hybrid, scalable solution that automatically switches between Pandas (for small files) and PySpark (for large files).
 5. Create a global config file contains module based configs. (need to check preferred option b/w single vs multiple configs).
 6. Log Rotation
 7. Add execution timing decorators
+
+Other :
+
+Story - 3
+Add compound index optimization for faster aggregation
+
+Improve memory efficiency (streaming cursor)
+
+Add confidence scoring strategy pattern
+
+Build deletion engine
+
+Convert to CLI tool
+
+Add Unit tests

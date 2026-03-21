@@ -1,13 +1,23 @@
 import time
 import logging
 import json
-from domain.interfaces import ScannerInterface, NormalizerInterface, FileRepositoryInterface
+from domain.interfaces import (
+    ScannerInterface,
+    NormalizerInterface,
+    FileRepositoryInterface,
+)
 
 logger = logging.getLogger(__name__)
 
 
 class DriveInventoryRunner:
-    def __init__(self, scanner: ScannerInterface, normalizer: NormalizerInterface, file_repo: FileRepositoryInterface, state_repo=None):
+    def __init__(
+        self,
+        scanner: ScannerInterface,
+        normalizer: NormalizerInterface,
+        file_repo: FileRepositoryInterface,
+        state_repo=None,
+    ):
         self.scanner = scanner
         self.normalizer = normalizer
         self.file_repo = file_repo
@@ -25,8 +35,12 @@ class DriveInventoryRunner:
             now = int(time.time())
             self.state_repo.update_last_scan_time("drive", now)
 
-        logger.info(json.dumps({
-            "event": "drive_scan_completed",
-            "total_records": count,
-            "duration_sec": round(time.time() - start_time, 2)
-        }))
+        logger.info(
+            json.dumps(
+                {
+                    "event": "drive_scan_completed",
+                    "total_records": count,
+                    "duration_sec": round(time.time() - start_time, 2),
+                }
+            )
+        )

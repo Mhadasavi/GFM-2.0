@@ -10,5 +10,5 @@ class MongoScanStateRepository:
         self.collection.update_one(
             {"source": source},
             {"$set": {"last_successful_scan_time": timestamp}},
-            upsert=True
+            upsert=True,
         )

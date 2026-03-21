@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 from typing import Optional
 
+
 @dataclass(frozen=True)
 class FileRecord:
     source_id: str  # Path for local, Drive ID for drive
