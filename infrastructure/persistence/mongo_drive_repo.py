@@ -22,15 +22,19 @@ class MongoDriveRepository:
             UpdateOne(
                 {"drive_file_id": record["drive_file_id"]},
                 {"$set": record},
-                upsert=True
+                upsert=True,
             )
             for record in records
         ]
 
         if operations:
             result = self.collection.bulk_write(operations)
-            logger.info(json.dumps({
-                "event": "drive_bulk_upsert",
-                "inserted": result.upserted_count,
-                "modified": result.modified_count
-            }))
+            logger.info(
+                json.dumps(
+                    {
+                        "event": "drive_bulk_upsert",
+                        "inserted": result.upserted_count,
+                        "modified": result.modified_count,
+                    }
+                )
+            )

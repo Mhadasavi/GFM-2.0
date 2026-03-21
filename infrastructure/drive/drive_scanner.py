@@ -17,8 +17,7 @@ class DriveScanner(ScannerInterface):
 
         if self.last_scan_time:
             iso_time = time.strftime(
-                "%Y-%m-%dT%H:%M:%SZ",
-                time.gmtime(self.last_scan_time)
+                "%Y-%m-%dT%H:%M:%SZ", time.gmtime(self.last_scan_time)
             )
             return f"{base_query} and modifiedTime > '{iso_time}'"
 
@@ -30,10 +29,7 @@ class DriveScanner(ScannerInterface):
         if source_path:
             query = f"'{source_path}' in parents and {query}"
 
-        logger.info(json.dumps({
-            "event": "drive_scan_started",
-            "query": query
-        }))
+        logger.info(json.dumps({"event": "drive_scan_started", "query": query}))
 
         for file in self.drive_client.list_files(query=query):
             yield file

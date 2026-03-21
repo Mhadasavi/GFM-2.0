@@ -1,10 +1,16 @@
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import List
-from domain.interfaces import ScannerInterface, HashingServiceInterface, FileRepositoryInterface, NormalizerInterface
+from domain.interfaces import (
+    ScannerInterface,
+    HashingServiceInterface,
+    FileRepositoryInterface,
+    NormalizerInterface,
+)
 from domain.models import FileRecord
 from utils.logging import get_logger
 
 logger = get_logger(__name__)
+
 
 class InventoryRunner:
     def __init__(
@@ -14,7 +20,7 @@ class InventoryRunner:
         hashing_service: HashingServiceInterface,
         file_repo: FileRepositoryInterface,
         max_workers: int = 4,
-        hash_algo: str = 'sha256'
+        hash_algo: str = "sha256",
     ):
         self.scanner = scanner
         self.normalizer = normalizer
@@ -25,37 +31,46 @@ class InventoryRunner:
 
     def run(self, dir_path: str):
         logger.info(f"Starting inventory run for directory: {dir_path}")
-        
+
         # We need to collect files that need hashing
         files_to_hash = []
         for raw_data in self.scanner.scan(dir_path):
             record = self.normalizer.normalize(raw_data)
             cached_record = self.file_repo.get_by_source_id(record.source_id)
-            
-            if not cached_record or cached_record.last_modified != record.last_modified or not cached_record.hash:
+
+            if (
+                not cached_record
+                or cached_record.last_modified != record.last_modified
+                or not cached_record.hash
+            ):
                 files_to_hash.append(record)
             else:
                 logger.debug(f"Cache hit for {record.source_id}. Skipping hashing.")
-        
+
         logger.info(f"Found files, {len(files_to_hash)} need hashing.")
 
         with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
-            futures = {executor.submit(self._process_file, record): record for record in files_to_hash}
+            futures = {
+                executor.submit(self._process_file, record): record
+                for record in files_to_hash
+            }
             for future in as_completed(futures):
                 record = futures[future]
                 try:
                     future.result()
                 except Exception as exc:
-                    logger.error(f'{record.source_id} generated an exception: {exc}')
-        
+                    logger.error(f"{record.source_id} generated an exception: {exc}")
+
         logger.info("Inventory run completed.")
 
     def _process_file(self, record: FileRecord):
         logger.info(f"Processing file: {record.source_id}")
         try:
             # For local files, source_id is the path
-            hash_value = self.hashing_service.stream_hash(record.source_id, self.hash_algo)
-            
+            hash_value = self.hashing_service.stream_hash(
+                record.source_id, self.hash_algo
+            )
+
             # Create a new FileRecord with the hash
             hashed_record = FileRecord(
                 source_id=record.source_id,
@@ -65,10 +80,12 @@ class InventoryRunner:
                 hash=hash_value,
                 hash_algo=self.hash_algo,
                 extension=record.extension,
-                last_modified=record.last_modified
+                last_modified=record.last_modified,
             )
-            
+
             self.file_repo.upsert(hashed_record)
-            logger.info(f"Successfully processed and stored hash for {record.source_id}")
+            logger.info(
+                f"Successfully processed and stored hash for {record.source_id}"
+            )
         except Exception as e:
             logger.error(f"Failed to process file {record.source_id}: {e}")

@@ -6,7 +6,7 @@ A robust tool to synchronize, deduplicate, and manage files between local storag
 
 - **Local Inventory:** Recursively scans local directories and computes content hashes (SHA-256) for image files.
 - **Drive Inventory:** Fetches Google Drive metadata and MD5 checksums incrementally to minimize API calls.
-- **Duplicate Detection (Engine):** 
+- **Duplicate Detection (Engine):**
     - **O(n) Comparison:** High-speed lookup using memory-efficient sets.
     - **Hash + Size Match:** Strictly identifies duplicates based on both content hash and file size.
     - **Status Tracking:** Automatically marks files as `DUPLICATE`, `UNIQUE`, or `UNVERIFIED` in the database.
