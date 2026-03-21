@@ -12,8 +12,7 @@ from infrastructure.drive.drive_client import DriveClient
 from infrastructure.drive.drive_scanner import DriveScanner
 from infrastructure.normalization.drive_normalizer import DriveNormalizer
 from services.drive_inventory_runner import DriveInventoryRunner
-# from services.comparison_service import ComparisonService # Needs refactoring for SQLite
-# from services.duplicate_detection_runner import DuplicateDetectionRunner
+from services.duplicate_detection_runner import DuplicateDetectionRunner
 
 from utils.logging import get_logger
 
@@ -58,12 +57,11 @@ def run_drive_inventory(config, logger):
 def run_duplicate_detection(config, logger):
     logger.info("Starting duplicate detection (SQLite)...")
     file_repo = SQLiteFileRepository(config.SQLITE_DB_PATH)
-    duplicates = file_repo.find_duplicates_by_hash()
     
-    logger.info(f"Found {len(duplicates)} duplicate records across all sources.")
-    # For now, just log some info. In a full implementation, we'd output to CSV/Excel as per AC.
-    for record in duplicates[:10]: # Log first 10
-        logger.info(f"Duplicate: {record.name} ({record.source_id}) - Hash: {record.hash}")
+    runner = DuplicateDetectionRunner(file_repo)
+    summary = runner.run()
+    
+    logger.info(f"Duplicate detection summary: {summary}")
 
 def main():
     logger = get_logger(__name__)

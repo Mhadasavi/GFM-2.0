@@ -6,76 +6,18 @@ A robust tool to synchronize, deduplicate, and manage files between local storag
 
 - **Local Inventory:** Recursively scans local directories and computes content hashes (SHA-256) for image files.
 - **Drive Inventory:** Fetches Google Drive metadata and MD5 checksums incrementally to minimize API calls.
-- **Duplicate Detection:** Compares local and Drive inventories to identify exact duplicates safely for deletion.
-- **Persistence:** Uses MongoDB for efficient storage and querying of file metadata and scan states.
+- **Duplicate Detection (Engine):** 
+    - **O(n) Comparison:** High-speed lookup using memory-efficient sets.
+    - **Hash + Size Match:** Strictly identifies duplicates based on both content hash and file size.
+    - **Status Tracking:** Automatically marks files as `DUPLICATE`, `UNIQUE`, or `UNVERIFIED` in the database.
+- **Unverified Files Handling:** Automatically moves files without MD5 hashes (like Google-native Docs/Sheets) to a separate table for safety.
+- **Persistence:** Uses SQLite for primary inventory and duplicate tracking. (Legacy support for MongoDB available).
+- **Daily Rotating Logs:** Built-in logging with daily rollover and configurable retention.
 
 ## Prerequisites
 
 - **Python 3.8+**
-- **Docker & Docker Compose:** For a production-like MongoDB setup.
 - **Google Cloud Project:** With Drive API enabled and OAuth 2.0 credentials.
-
-## MongoDB Setup
-
-GFM 2.0 uses a production-style MongoDB configuration with replica sets and authentication for high availability and performance.
-
-### 1. Initialize MongoDB with Docker
-
-Go to the `mongo-prod-setup` directory and start the container:
-
-```bash
-cd mongo-prod-setup
-docker-compose up -d
-```
-
-### 2. Initialize Replica Set and Admin User
-
-Enter the MongoDB container:
-
-```bash
-docker exec -it mongodb mongosh
-```
-
-Inside the `mongosh` prompt, initialize the replica set:
-
-```javascript
-rs.initiate()
-```
-
-Wait a few seconds for it to become Primary (check with `rs.status()`), then create the admin user:
-
-```javascript
-db.getSiblingDB("admin").createUser({
-  user: "admin",
-  pwd: "StrongPassword123!",
-  roles: [{ role: "root", db: "admin" }]
-})
-```
-
-### 3. Setup Database and Collections
-
-You can use the provided setup script to create collections and indexes automatically:
-
-```bash
-# From the project root
-python setup_mongo.py
-```
-
-Alternatively, you can manually set them up in `mongosh`:
-
-```javascript
-use inventory
-
-db.createCollection("local_files")
-db.createCollection("drive_files")
-db.createCollection("deletion_batches")
-
-// Critical indexes for scale
-db.local_files.createIndex({ size: 1, hash: 1 })
-db.drive_files.createIndex({ size: 1, hash: 1 })
-db.local_files.createIndex({ path: 1 }, { unique: true })
-db.drive_files.createIndex({ drive_file_id: 1 }, { unique: true })
-```
 
 ## Installation
 
@@ -105,11 +47,13 @@ The application is configured via environment variables. You can set these in yo
 
 | Variable | Description | Default |
 | :--- | :--- | :--- |
-| `MONGO_CONNECTION_STRING` | MongoDB connection URI | `mongodb://admin:StrongPassword123!@localhost:27017/?authSource=admin&directConnection=true` |
-| `DB_NAME` | Database name | `inventory` |
-| `SCAN_DIRECTORY` | Local directory to scan | (Project root) |
+| `SQLITE_DB_PATH` | SQLite database file path | `inventory.db` |
+| `SCAN_DIRECTORY` | Local directory to scan | (See config.py) |
 | `HASH_ALGO` | Hash algorithm for local files | `sha256` |
 | `MAX_WORKERS` | Parallel workers for hashing | `4` |
+| `LOG_PATH` | Path to the application log file | `logs/app.log` |
+| `DELETE_OLD_LOGS` | Whether to delete logs older than retention | `False` |
+| `LOG_RETENTION_DAYS` | Number of days to keep log files | `30` |
 | `CREDENTIALS_PATH` | Path to Google Drive credentials | `credentials/credentials.json` |
 | `TOKEN_PATH` | Path to Google Drive token | `credentials/token.json` |
 
@@ -141,19 +85,28 @@ Executes local scan, Drive scan, and duplicate detection sequentially.
 python -m app.main all
 ```
 
-## Project Structure
+## Logging
 
-- `app/`: Application entry point and configuration.
-- `services/`: Core business logic and runners.
-- `infrastructure/`: External integrations (Drive, Local FS, MongoDB).
-- `domain/`: Business models and interfaces.
-- `utils/`: Shared utilities like logging and validation.
+GFM 2.0 uses a **Timed Rotating File Handler** for logging:
+- **Daily Rotation:** A new log file is created at midnight every day.
+- **Retention:** By default, it keeps logs forever (`DELETE_OLD_LOGS=False`). If enabled, it will maintain a rolling window of the last `LOG_RETENTION_DAYS` (default: 30).
+- **Console & File:** Logs are simultaneously printed to the console and saved to disk.
 
 ## Safety Rules
 
-- Only files with matching hashes and sizes are marked for deletion.
-- Files must be explicitly marked as `eligible_for_dedup` (e.g., binary images with valid checksums).
-- No actual deletion occurs in the current version; results are stored in the `duplicate_results` collection for review.
+- **Hash Match (Mandatory):** No file is ever considered a duplicate without an exact hash match.
+- **Size Match (Mandatory):** Adds an extra layer of security before marking for deletion.
+- **Unverified Isolation:** Files missing MD5 hashes (mostly Google Docs) are moved to the `unverified_files` table and never marked as duplicates automatically.
+- **Local Confirmation:** A Drive file is only marked `DUPLICATE` if a confirmed copy exists in your local inventory.
+
+## Project Structure
+
+- `app/`: Application entry point and configuration.
+- `services/`: Core business logic (comparison engine, runners).
+- `infrastructure/`: External integrations (Drive, Local FS, Persistence).
+- `domain/`: Business models, interfaces, and rules.
+- `utils/`: Shared utilities (logging, validation).
+- `logs/`: Automatically created directory for daily logs.
 
 ## License
 
