@@ -27,7 +27,8 @@ class SQLiteFileRepository(FileRepositoryInterface):
                     hash_algo TEXT,
                     extension TEXT,
                     last_modified REAL,
-                    status TEXT
+                    status TEXT,
+                    confidence_score INTEGER DEFAULT 0
                 )
             """
             )
@@ -53,11 +54,17 @@ class SQLiteFileRepository(FileRepositoryInterface):
                 "CREATE INDEX IF NOT EXISTS idx_unverified_source ON unverified_files (source)"
             )
 
-            # Migration: Ensure status column exists if it was created previously without it
+            # Migrations: Ensure status and confidence_score columns exist
             try:
                 conn.execute("ALTER TABLE file_records ADD COLUMN status TEXT")
             except sqlite3.OperationalError:
-                # Column already exists
+                pass
+
+            try:
+                conn.execute(
+                    "ALTER TABLE file_records ADD COLUMN confidence_score INTEGER DEFAULT 0"
+                )
+            except sqlite3.OperationalError:
                 pass
 
             conn.commit()
@@ -71,8 +78,8 @@ class SQLiteFileRepository(FileRepositoryInterface):
         with self._get_connection() as conn:
             conn.execute(
                 """
-                INSERT INTO file_records (source_id, name, size, source, hash, hash_algo, extension, last_modified, status)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                INSERT INTO file_records (source_id, name, size, source, hash, hash_algo, extension, last_modified, status, confidence_score)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(source_id) DO UPDATE SET
                     name=excluded.name,
                     size=excluded.size,
@@ -81,7 +88,8 @@ class SQLiteFileRepository(FileRepositoryInterface):
                     hash_algo=excluded.hash_algo,
                     extension=excluded.extension,
                     last_modified=excluded.last_modified,
-                    status=excluded.status
+                    status=excluded.status,
+                    confidence_score=excluded.confidence_score
             """,
                 (
                     record.source_id,
@@ -93,6 +101,7 @@ class SQLiteFileRepository(FileRepositoryInterface):
                     record.extension,
                     record.last_modified,
                     record.status,
+                    record.confidence_score,
                 ),
             )
             conn.commit()
@@ -126,7 +135,7 @@ class SQLiteFileRepository(FileRepositoryInterface):
     def get_by_source_id(self, source_id: str) -> Optional[FileRecord]:
         with self._get_connection() as conn:
             cursor = conn.execute(
-                "SELECT source_id, name, size, source, hash, hash_algo, extension, last_modified, status FROM file_records WHERE source_id = ?",
+                "SELECT source_id, name, size, source, hash, hash_algo, extension, last_modified, status, confidence_score FROM file_records WHERE source_id = ?",
                 (source_id,),
             )
             row = cursor.fetchone()
@@ -135,7 +144,7 @@ class SQLiteFileRepository(FileRepositoryInterface):
 
             # Check unverified if not found in main
             cursor = conn.execute(
-                "SELECT source_id, name, size, source, NULL, NULL, extension, last_modified, 'UNVERIFIED' FROM unverified_files WHERE source_id = ?",
+                "SELECT source_id, name, size, source, NULL, NULL, extension, last_modified, 'UNVERIFIED', 0 FROM unverified_files WHERE source_id = ?",
                 (source_id,),
             )
             row = cursor.fetchone()
@@ -151,7 +160,7 @@ class SQLiteFileRepository(FileRepositoryInterface):
         with self._get_connection() as conn:
             cursor = conn.execute(
                 """
-                SELECT source_id, name, size, source, hash, hash_algo, extension, last_modified, status
+                SELECT source_id, name, size, source, hash, hash_algo, extension, last_modified, status, confidence_score
                 FROM file_records
                 WHERE (hash, size) IN (
                     SELECT hash, size FROM file_records WHERE hash IS NOT NULL GROUP BY hash, size HAVING COUNT(*) > 1
@@ -161,11 +170,13 @@ class SQLiteFileRepository(FileRepositoryInterface):
             )
             return [self._row_to_record(row) for row in cursor.fetchall()]
 
-    def update_status(self, source_id: str, status: str):
+    def update_status_and_score(
+        self, source_id: str, status: str, confidence_score: int
+    ):
         with self._get_connection() as conn:
             conn.execute(
-                "UPDATE file_records SET status = ? WHERE source_id = ?",
-                (status, source_id),
+                "UPDATE file_records SET status = ?, confidence_score = ? WHERE source_id = ?",
+                (status, confidence_score, source_id),
             )
             conn.commit()
 
@@ -180,4 +191,5 @@ class SQLiteFileRepository(FileRepositoryInterface):
             extension=row[6],
             last_modified=row[7],
             status=row[8],
+            confidence_score=row[9],
         )

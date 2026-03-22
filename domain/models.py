@@ -13,3 +13,4 @@ class FileRecord:
     extension: Optional[str] = None
     last_modified: Optional[float] = None
     status: Optional[str] = None  # 'DUPLICATE', 'UNIQUE', 'UNVERIFIED'
+    confidence_score: int = 0  # 0-100
