@@ -7,11 +7,19 @@ A robust tool to synchronize, deduplicate, and manage files between local storag
 - **Local Inventory:** Recursively scans local directories and computes content hashes (SHA-256) for image files.
 - **Drive Inventory:** Fetches Google Drive metadata and MD5 checksums incrementally to minimize API calls.
 - **Duplicate Detection (Engine):**
-    - **O(n) Comparison:** High-speed lookup using memory-efficient sets.
-    - **Hash + Size Match:** Strictly identifies duplicates based on both content hash and file size.
-    - **Status Tracking:** Automatically marks files as `DUPLICATE`, `UNIQUE`, or `UNVERIFIED` in the database.
-- **Unverified Files Handling:** Automatically moves files without MD5 hashes (like Google-native Docs/Sheets) to a separate table for safety.
-- **Persistence:** Uses SQLite for primary inventory and duplicate tracking. (Legacy support for MongoDB available).
+    - **O(n) Comparison:** High-speed lookup using memory-efficient dictionaries.
+    - **Status Tracking:** Automatically marks files as `DUPLICATE`, `UNIQUE`, or `UNVERIFIED`.
+- **Confidence Scoring Engine:**
+    - **Defense-in-Depth:** Every potential duplicate is assigned a score (0-100).
+    - **Weighted Scoring:**
+        - Hash Match: **70%**
+        - Size Match: **20%**
+        - Extension Match: **5%**
+        - Filename Match: **5%**
+    - **Safety Threshold:** Only files with a score **≥ 90** are marked for deletion.
+- **Auditable Decisions:** Every scoring decision is recorded in `logs/audit.csv` with detailed metadata.
+- **Unverified Files Handling:** Google-native files (Docs, Sheets) or files missing hashes are isolated in a separate `unverified_files` table.
+- **Persistence:** Uses SQLite for primary inventory and duplicate tracking.
 - **Daily Rotating Logs:** Built-in logging with daily rollover and configurable retention.
 
 ## Prerequisites
@@ -73,8 +81,7 @@ Fetches metadata and MD5 checksums for Drive files.
 python -m app.main drive
 ```
 
-### 3. Detect Duplicates
-Compares local and Drive records to find safe-to-delete duplicates.
+### 3. Detect Duplicates & Score
 ```bash
 python -m app.main compare
 ```
@@ -85,25 +92,22 @@ Executes local scan, Drive scan, and duplicate detection sequentially.
 python -m app.main all
 ```
 
-## Logging
+## Logging & Auditing
 
-GFM 2.0 uses a **Timed Rotating File Handler** for logging:
-- **Daily Rotation:** A new log file is created at midnight every day.
-- **Retention:** By default, it keeps logs forever (`DELETE_OLD_LOGS=False`). If enabled, it will maintain a rolling window of the last `LOG_RETENTION_DAYS` (default: 30).
-- **Console & File:** Logs are simultaneously printed to the console and saved to disk.
+- **App Logs (`logs/app.log`):** Daily rotating system logs for debugging and monitoring.
+- **Audit Logs (`logs/audit.csv`):** Permanent record of every duplicate decision, including the specific confidence score and hash.
 
-## Safety Rules
+## Safety Rules (Confidence Engine)
 
-- **Hash Match (Mandatory):** No file is ever considered a duplicate without an exact hash match.
-- **Size Match (Mandatory):** Adds an extra layer of security before marking for deletion.
-- **Unverified Isolation:** Files missing MD5 hashes (mostly Google Docs) are moved to the `unverified_files` table and never marked as duplicates automatically.
-- **Local Confirmation:** A Drive file is only marked `DUPLICATE` if a confirmed copy exists in your local inventory.
+- **Mandatory Match:** No file is marked as a duplicate without matching both Hash and Size (minimum score of 90).
+- **Explicit Thresholds:** Files with a score below 90 (e.g., matching hash but different size) are marked `UNIQUE` and kept safe.
+- **Unverified Isolation:** Files without checksums are NEVER automatically marked for deletion.
 
 ## Project Structure
 
 - `app/`: Application entry point and configuration.
-- `services/`: Core business logic (comparison engine, runners).
-- `infrastructure/`: External integrations (Drive, Local FS, Persistence).
+- `services/`: Core business logic (Comparison & Confidence Engine).
+- `infrastructure/`: External integrations (Drive, Local FS, SQLite).
 - `domain/`: Business models, interfaces, and rules.
 - `utils/`: Shared utilities (logging, validation).
 - `logs/`: Automatically created directory for daily logs.

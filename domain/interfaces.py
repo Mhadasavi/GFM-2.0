@@ -33,3 +33,9 @@ class FileRepositoryInterface(ABC):
     @abstractmethod
     def find_duplicates_by_hash(self) -> List[FileRecord]:
         pass
+
+    @abstractmethod
+    def update_status_and_score(
+        self, source_id: str, status: str, confidence_score: int
+    ):
+        pass
