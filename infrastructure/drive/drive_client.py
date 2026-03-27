@@ -8,7 +8,7 @@ from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 
-SCOPES = ["https://www.googleapis.com/auth/drive.metadata.readonly"]
+SCOPES = ["https://www.googleapis.com/auth/drive"]
 
 logger = logging.getLogger(__name__)
 
@@ -41,6 +41,21 @@ class DriveClient:
 
         logger.info(json.dumps({"event": "drive_auth_success"}))
         return build("drive", "v3", credentials=creds)
+
+    def delete_file(self, file_id: str):
+        """
+        Permanently deletes a file from Google Drive.
+        """
+        try:
+            self.service.files().delete(fileId=file_id).execute()
+            logger.info(json.dumps({"event": "drive_file_deleted", "file_id": file_id}))
+        except HttpError as error:
+            logger.error(
+                json.dumps(
+                    {"event": "drive_delete_error", "file_id": file_id, "error": str(error)}
+                )
+            )
+            raise
 
     def list_files(
         self,
