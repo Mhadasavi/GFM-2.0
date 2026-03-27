@@ -31,15 +31,30 @@ class DeletionService:
 
         # 1. Fetch Drive records from repository
         drive_records = self._get_drive_records()
-        logger.info(f"Retrieved {len(drive_records)} Drive records from inventory.")
+        logger.info(json.dumps({
+            "event": "deletion_scan_start",
+            "scanned_file_count": len(drive_records)
+        }))
 
         # 2. Prepare report data
         report_data = []
-        summary = {"proposed_deletions": 0, "proposed_keeps": 0, "actual_deletions": 0}
+        summary = {
+            "scanned_files": len(drive_records),
+            "duplicates_found": 0,
+            "proposed_deletions": 0,
+            "proposed_keeps": 0,
+            "actual_deletions": 0,
+            "errors": 0
+        }
 
         for record in drive_records:
+            is_duplicate = (record.status == "DUPLICATE")
+            if is_duplicate:
+                summary["duplicates_found"] += 1
+
             # AC: Only files marked DELETE with confidence >= 90 are removed
-            proposed_action = "DELETE" if (record.status == "DUPLICATE" and record.confidence_score >= 90) else "KEEP"
+            should_delete = (is_duplicate and record.confidence_score >= 90)
+            proposed_action = "DELETE" if should_delete else "KEEP"
 
             if proposed_action == "DELETE":
                 summary["proposed_deletions"] += 1
@@ -53,13 +68,11 @@ class DeletionService:
                     "Confidence score": record.confidence_score,
                     "Proposed action": proposed_action,
                     "Hash": record.hash,
+                    "Status": "PENDING"
                 }
             )
 
-        # 3. Export report
-        self._export_report(report_data, output_report_path)
-
-        # 4. Perform actual trashing if not dry-run
+        # 3. Perform actual trashing if not dry-run
         if not dry_run:
             for item in report_data:
                 if item["Proposed action"] == "DELETE":
@@ -76,16 +89,37 @@ class DeletionService:
                             "event": "file_trashed_action",
                             "timestamp": datetime.now().isoformat(),
                             "file_id": file_id,
-                            "hash": file_hash
+                            "hash": file_hash,
+                            "status": "SUCCESS"
                         }))
 
                         # Update status in repository
                         self.repo.update_status_and_score(file_id, "DELETED", item["Confidence score"])
                         summary["actual_deletions"] += 1
+                        item["Status"] = "TRASHED_SUCCESS"
                     except Exception as e:
-                        logger.error(f"Failed to trash {file_id}: {e}")
+                        summary["errors"] += 1
+                        item["Status"] = f"FAILED: {str(e)}"
+                        logger.error(json.dumps({
+                            "event": "file_trash_failed",
+                            "file_id": file_id,
+                            "error": str(e),
+                            "action": "trash"
+                        }))
+                else:
+                    item["Status"] = "SKIPPED_KEEP"
+        else:
+            for item in report_data:
+                item["Status"] = "SKIPPED_DRY_RUN"
 
-        logger.info(f"Deletion summary: {summary}")
+        # 4. Export report (Full visibility into actions taken)
+        self._export_report(report_data, output_report_path)
+
+        logger.info(json.dumps({
+            "event": "deletion_process_summary",
+            "summary": summary,
+            "dry_run": dry_run
+        }))
         return summary
 
     def _get_drive_records(self):
