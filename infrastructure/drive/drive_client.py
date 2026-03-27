@@ -44,15 +44,15 @@ class DriveClient:
 
     def delete_file(self, file_id: str):
         """
-        Permanently deletes a file from Google Drive.
+        Moves a file to the trash in Google Drive instead of permanently deleting it.
         """
         try:
-            self.service.files().delete(fileId=file_id).execute()
-            logger.info(json.dumps({"event": "drive_file_deleted", "file_id": file_id}))
+            self.service.files().update(fileId=file_id, body={"trashed": True}).execute()
+            logger.info(json.dumps({"event": "drive_file_trashed", "file_id": file_id}))
         except HttpError as error:
             logger.error(
                 json.dumps(
-                    {"event": "drive_delete_error", "file_id": file_id, "error": str(error)}
+                    {"event": "drive_trash_error", "file_id": file_id, "error": str(error)}
                 )
             )
             raise

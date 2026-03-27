@@ -2,6 +2,7 @@ import os
 import csv
 import logging
 import json
+import time
 from datetime import datetime
 from typing import List, Dict
 from domain.interfaces import FileRepositoryInterface
@@ -20,9 +21,9 @@ class DeletionService:
         self, dry_run: bool = True, output_report_path: str = "logs/deletion_report.csv"
     ) -> Dict[str, int]:
         """
-        Processes Drive duplicates for deletion.
+        Processes Drive duplicates for deletion (trashing).
         If dry_run=True, only generates a report.
-        If dry_run=False, performs deletions and updates the database.
+        If dry_run=False, performs trashing and updates the database.
         """
         logger.info(
             f"Starting deletion process (dry_run={dry_run}, report={output_report_path})"
@@ -37,8 +38,8 @@ class DeletionService:
         summary = {"proposed_deletions": 0, "proposed_keeps": 0, "actual_deletions": 0}
 
         for record in drive_records:
-            # We only propose deletion for those marked DUPLICATE (score >= 90)
-            proposed_action = "DELETE" if record.status == "DUPLICATE" else "KEEP"
+            # AC: Only files marked DELETE with confidence >= 90 are removed
+            proposed_action = "DELETE" if (record.status == "DUPLICATE" and record.confidence_score >= 90) else "KEEP"
 
             if proposed_action == "DELETE":
                 summary["proposed_deletions"] += 1
@@ -51,25 +52,38 @@ class DeletionService:
                     "Name": record.name,
                     "Confidence score": record.confidence_score,
                     "Proposed action": proposed_action,
+                    "Hash": record.hash,
                 }
             )
 
         # 3. Export report
         self._export_report(report_data, output_report_path)
 
-        # 4. Perform actual deletions if not dry-run
+        # 4. Perform actual trashing if not dry-run
         if not dry_run:
             for item in report_data:
                 if item["Proposed action"] == "DELETE":
                     file_id = item["Drive file ID"]
+                    file_hash = item["Hash"]
                     try:
+                        # Rate-limiting: Small delay between API calls
+                        time.sleep(0.1)
+
                         self.drive_client.delete_file(file_id)
+
+                        # AC: Deletion is logged with timestamp, file ID, hash
+                        logger.info(json.dumps({
+                            "event": "file_trashed_action",
+                            "timestamp": datetime.now().isoformat(),
+                            "file_id": file_id,
+                            "hash": file_hash
+                        }))
+
                         # Update status in repository
                         self.repo.update_status_and_score(file_id, "DELETED", item["Confidence score"])
                         summary["actual_deletions"] += 1
-                        logger.info(f"Deleted and updated: {file_id}")
                     except Exception as e:
-                        logger.error(f"Failed to delete {file_id}: {e}")
+                        logger.error(f"Failed to trash {file_id}: {e}")
 
         logger.info(f"Deletion summary: {summary}")
         return summary
