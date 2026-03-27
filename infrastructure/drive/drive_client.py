@@ -8,7 +8,7 @@ from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 
-SCOPES = ["https://www.googleapis.com/auth/drive.metadata.readonly"]
+SCOPES = ["https://www.googleapis.com/auth/drive"]
 
 logger = logging.getLogger(__name__)
 
@@ -29,6 +29,16 @@ class DriveClient:
             if creds and creds.expired and creds.refresh_token:
                 creds.refresh(Request())
             else:
+                if not os.path.exists(self.credentials_path):
+                    error_msg = (
+                        f"Drive credentials not found at: {self.credentials_path}\n"
+                        "Please place your Google Cloud 'credentials.json' file in the "
+                        f"'{os.path.dirname(self.credentials_path)}' directory.\n"
+                        "Refer to the README.md for setup instructions."
+                    )
+                    logger.error(json.dumps({"event": "drive_credentials_missing", "path": self.credentials_path}))
+                    raise FileNotFoundError(error_msg)
+
                 flow = InstalledAppFlow.from_client_secrets_file(
                     self.credentials_path, SCOPES
                 )
@@ -41,6 +51,21 @@ class DriveClient:
 
         logger.info(json.dumps({"event": "drive_auth_success"}))
         return build("drive", "v3", credentials=creds)
+
+    def delete_file(self, file_id: str):
+        """
+        Moves a file to the trash in Google Drive instead of permanently deleting it.
+        """
+        try:
+            self.service.files().update(fileId=file_id, body={"trashed": True}).execute()
+            logger.info(json.dumps({"event": "drive_file_trashed", "file_id": file_id}))
+        except HttpError as error:
+            logger.error(
+                json.dumps(
+                    {"event": "drive_trash_error", "file_id": file_id, "error": str(error)}
+                )
+            )
+            raise
 
     def list_files(
         self,
