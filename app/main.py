@@ -13,6 +13,7 @@ from infrastructure.drive.drive_scanner import DriveScanner
 from infrastructure.normalization.drive_normalizer import DriveNormalizer
 from services.drive_inventory_runner import DriveInventoryRunner
 from services.duplicate_detection_runner import DuplicateDetectionRunner
+from services.deletion_service import DeletionService
 
 from utils.logging import get_logger
 
@@ -66,15 +67,35 @@ def run_duplicate_detection(config, logger):
     logger.info(f"Duplicate detection summary: {summary}")
 
 
+def run_deletion(config, logger, dry_run=True):
+    logger.info(f"Initiating deletion flow (dry_run={dry_run})...")
+    file_repo = SQLiteFileRepository(config.SQLITE_DB_PATH)
+    drive_client = DriveClient(
+        credentials_path=config.CREDENTIALS_PATH, token_path=config.TOKEN_PATH
+    )
+
+    service = DeletionService(file_repo, drive_client)
+    summary = service.run_deletion(dry_run=dry_run)
+
+    logger.info(f"Deletion flow completed. Summary: {summary}")
+    if dry_run:
+        print("\n[DRY RUN] Report generated at logs/deletion_report.csv")
+        print(f"[DRY RUN] Proposed deletions: {summary['proposed_deletions']}")
+    else:
+        print("\n[FORCE DELETE] Action completed.")
+        print(f"[FORCE DELETE] Files deleted: {summary['actual_deletions']}")
+
+
 def main():
     logger = get_logger(__name__)
     config = Config()
 
     if len(sys.argv) < 2:
-        print("Usage: python -m app.main [local|drive|compare|all]")
+        print("Usage: python -m app.main [local|drive|compare|delete|all] [--force]")
         return
 
     command = sys.argv[1].lower()
+    force_delete = "--force" in sys.argv
 
     if command in ["local", "all"]:
         try:
@@ -93,6 +114,12 @@ def main():
             run_duplicate_detection(config, logger)
         except Exception as e:
             logger.error(f"Duplicate detection failed: {e}", exc_info=True)
+
+    if command == "delete":
+        try:
+            run_deletion(config, logger, dry_run=(not force_delete))
+        except Exception as e:
+            logger.error(f"Deletion process failed: {e}", exc_info=True)
 
 
 if __name__ == "__main__":

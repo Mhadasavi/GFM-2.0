@@ -8,7 +8,7 @@ from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 
-SCOPES = ["https://www.googleapis.com/auth/drive.metadata.readonly"]
+SCOPES = ["https://www.googleapis.com/auth/drive"]
 
 logger = logging.getLogger(__name__)
 
@@ -41,6 +41,21 @@ class DriveClient:
 
         logger.info(json.dumps({"event": "drive_auth_success"}))
         return build("drive", "v3", credentials=creds)
+
+    def delete_file(self, file_id: str):
+        """
+        Moves a file to the trash in Google Drive instead of permanently deleting it.
+        """
+        try:
+            self.service.files().update(fileId=file_id, body={"trashed": True}).execute()
+            logger.info(json.dumps({"event": "drive_file_trashed", "file_id": file_id}))
+        except HttpError as error:
+            logger.error(
+                json.dumps(
+                    {"event": "drive_trash_error", "file_id": file_id, "error": str(error)}
+                )
+            )
+            raise
 
     def list_files(
         self,
