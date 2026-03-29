@@ -81,6 +81,7 @@ class InventoryRunner:
                 hash_algo=self.hash_algo,
                 extension=record.extension,
                 last_modified=record.last_modified,
+                confidence_score=0
             )
 
             self.file_repo.upsert(hashed_record)

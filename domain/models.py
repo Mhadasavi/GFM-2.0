@@ -20,8 +20,8 @@ class FileRecord(Base):
     hash_algo: Mapped[Optional[str]] = mapped_column(String)
     extension: Mapped[Optional[str]] = mapped_column(String)
     last_modified: Mapped[Optional[float]] = mapped_column(Float)
-    status: Mapped[Optional[str]] = mapped_column(String, index=True)  # 'DUPLICATE', 'UNIQUE', 'UNVERIFIED'
-    confidence_score: Mapped[int] = mapped_column(Integer, default=0)
+    status: Mapped[Optional[str]] = mapped_column(String, index=True, nullable=True)  # 'DUPLICATE', 'UNIQUE', 'UNVERIFIED'
+    confidence_score: Mapped[int] = mapped_column(Integer, default=0, server_default="0", nullable=False)
 
     # Composite index for size and hash as used in Mongo
     __table_args__ = (

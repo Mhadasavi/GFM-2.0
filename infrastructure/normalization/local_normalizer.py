@@ -21,4 +21,5 @@ class LocalNormalizer(NormalizerInterface):
             source="local",
             extension=extension,
             last_modified=last_modified,
+            confidence_score=0
         )

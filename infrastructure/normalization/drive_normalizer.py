@@ -21,6 +21,7 @@ class DriveNormalizer(NormalizerInterface):
             hash=md5,
             hash_algo="md5" if md5 else None,
             extension=extension,
+            confidence_score=0
         )
 
     def to_drive_file(self, raw_data: dict) -> DriveFile:
