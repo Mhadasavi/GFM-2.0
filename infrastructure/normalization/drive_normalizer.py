@@ -1,6 +1,6 @@
 from domain.interfaces import NormalizerInterface
 from domain.models import FileRecord, DriveFile
-import time
+from datetime import datetime
 
 
 class DriveNormalizer(NormalizerInterface):
@@ -12,6 +12,17 @@ class DriveNormalizer(NormalizerInterface):
         extension = name.split(".")[-1].lower() if "." in name else None
         size = int(raw_data.get("size", 0)) if raw_data.get("size") else 0
         md5 = raw_data.get("md5Checksum")
+        
+        modified_time_str = raw_data.get("modifiedTime")
+        last_modified = None
+        if modified_time_str:
+            # Drive API returns ISO strings ending in Z or .mmmZ
+            # Replace Z with +00:00 for fromisoformat or handle manually
+            iso_str = modified_time_str.replace("Z", "+00:00")
+            try:
+                last_modified = datetime.fromisoformat(iso_str)
+            except ValueError:
+                pass
 
         return FileRecord(
             source_id=raw_data["id"],
@@ -21,6 +32,7 @@ class DriveNormalizer(NormalizerInterface):
             hash=md5,
             hash_algo="md5" if md5 else None,
             extension=extension,
+            last_modified=last_modified,
             confidence_score=0
         )
 
@@ -34,22 +46,14 @@ class DriveNormalizer(NormalizerInterface):
         parents = raw_data.get("parents", [])
         parent_id = parents[0] if parents else None
         
-        # Drive gives ISO strings for modifiedTime
-        # We can store it as a float for consistency with other models
-        # but the model says Float so we should convert it.
         modified_time_str = raw_data.get("modifiedTime")
         last_modified = None
         if modified_time_str:
+            iso_str = modified_time_str.replace("Z", "+00:00")
             try:
-                # Basic conversion, could be more robust
-                struct_time = time.strptime(modified_time_str, "%Y-%m-%dT%H:%M:%S.%fZ")
-                last_modified = float(time.mktime(struct_time))
+                last_modified = datetime.fromisoformat(iso_str)
             except ValueError:
-                try:
-                     struct_time = time.strptime(modified_time_str, "%Y-%m-%dT%H:%M:%SZ")
-                     last_modified = float(time.mktime(struct_time))
-                except ValueError:
-                    pass
+                pass
 
         return DriveFile(
             drive_file_id=raw_data["id"],
@@ -59,6 +63,5 @@ class DriveNormalizer(NormalizerInterface):
             hash=md5,
             last_modified=last_modified,
             parent_id=parent_id,
-            # Path can be reconstructed later or fetched if needed
             eligible_for_dedup=True 
         )

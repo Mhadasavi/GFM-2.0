@@ -1,6 +1,7 @@
-from sqlalchemy import String, BigInteger, Float, Integer, Index
+from sqlalchemy import String, BigInteger, Float, Integer, Index, DateTime
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 from typing import Optional
+from datetime import datetime
 
 
 class Base(DeclarativeBase):
@@ -19,7 +20,7 @@ class FileRecord(Base):
     hash: Mapped[Optional[str]] = mapped_column(String, index=True)
     hash_algo: Mapped[Optional[str]] = mapped_column(String)
     extension: Mapped[Optional[str]] = mapped_column(String)
-    last_modified: Mapped[Optional[float]] = mapped_column(Float)
+    last_modified: Mapped[Optional[datetime]] = mapped_column(DateTime)
     status: Mapped[Optional[str]] = mapped_column(String, index=True, nullable=True)  # 'DUPLICATE', 'UNIQUE', 'UNVERIFIED'
     confidence_score: Mapped[int] = mapped_column(Integer, default=0, server_default="0", nullable=False)
 
@@ -37,7 +38,7 @@ class FileRecord(Base):
             "hash": self.hash,
             "hash_algo": self.hash_algo,
             "extension": self.extension,
-            "last_modified": self.last_modified,
+            "last_modified": self.last_modified.isoformat() if self.last_modified else None,
             "status": self.status,
             "confidence_score": self.confidence_score,
         }
@@ -52,7 +53,7 @@ class DriveFile(Base):
     size: Mapped[int] = mapped_column(BigInteger, index=True)
     mime_type: Mapped[Optional[str]] = mapped_column(String)
     hash: Mapped[Optional[str]] = mapped_column(String, index=True)
-    last_modified: Mapped[Optional[float]] = mapped_column(Float)
+    last_modified: Mapped[Optional[datetime]] = mapped_column(DateTime)
     eligible_for_dedup: Mapped[bool] = mapped_column(default=True, index=True)
     parent_id: Mapped[Optional[str]] = mapped_column(String)
     path: Mapped[Optional[str]] = mapped_column(String)

@@ -1,10 +1,12 @@
+import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from typing import List
+from typing import List, Optional
 from domain.interfaces import (
     ScannerInterface,
     HashingServiceInterface,
     FileRepositoryInterface,
     NormalizerInterface,
+    ScanStateRepositoryInterface
 )
 from domain.models import FileRecord
 from utils.logging import get_logger
@@ -19,6 +21,7 @@ class InventoryRunner:
         normalizer: NormalizerInterface,
         hashing_service: HashingServiceInterface,
         file_repo: FileRepositoryInterface,
+        state_repo: Optional[ScanStateRepositoryInterface] = None,
         max_workers: int = 4,
         hash_algo: str = "sha256",
     ):
@@ -26,6 +29,7 @@ class InventoryRunner:
         self.normalizer = normalizer
         self.hashing_service = hashing_service
         self.file_repo = file_repo
+        self.state_repo = state_repo
         self.max_workers = max_workers
         self.hash_algo = hash_algo
 
@@ -60,6 +64,11 @@ class InventoryRunner:
                     future.result()
                 except Exception as exc:
                     logger.error(f"{record.source_id} generated an exception: {exc}")
+
+        # Update scan state after successful run
+        if self.state_repo:
+            now = int(time.time())
+            self.state_repo.update_last_scan_time("local", now)
 
         logger.info("Inventory run completed.")
 

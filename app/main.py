@@ -28,7 +28,7 @@ from services.deletion_service import DeletionService
 from utils.logging import get_logger
 
 
-def run_local_inventory(config, logger, file_repo):
+def run_local_inventory(config, logger, file_repo, state_repo):
     logger.info("Starting local inventory run...")
     scanner = LocalScanner()
     normalizer = LocalNormalizer()
@@ -39,6 +39,7 @@ def run_local_inventory(config, logger, file_repo):
         normalizer=normalizer,
         hashing_service=hashing_service,
         file_repo=file_repo,
+        state_repo=state_repo,
         max_workers=config.MAX_WORKERS,
         hash_algo=config.HASH_ALGO,
     )
@@ -62,7 +63,12 @@ def run_drive_inventory(config, logger, file_repo, drive_repo, state_repo):
         print(f"\n[ERROR] {e}")
         return
 
-    scanner = DriveScanner(drive_client)
+    # Enable incremental scanning if we have a last scan time
+    last_scan_time = state_repo.get_last_scan_time("drive")
+    if last_scan_time:
+        logger.info(f"Using incremental scan from timestamp: {last_scan_time}")
+
+    scanner = DriveScanner(drive_client, last_scan_time=last_scan_time)
     normalizer = DriveNormalizer()
 
     runner = DriveInventoryRunner(scanner, normalizer, file_repo, drive_repo, state_repo)
@@ -119,7 +125,7 @@ def main():
 
     if command in ["local", "all"]:
         try:
-            run_local_inventory(config, logger, file_repo)
+            run_local_inventory(config, logger, file_repo, state_repo)
         except Exception as e:
             logger.error(f"Local inventory failed: {e}", exc_info=True)
 
