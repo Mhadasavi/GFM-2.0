@@ -1,6 +1,7 @@
 from domain.interfaces import NormalizerInterface
 from domain.models import FileRecord
 import os
+from datetime import datetime
 
 
 class LocalNormalizer(NormalizerInterface):
@@ -11,7 +12,8 @@ class LocalNormalizer(NormalizerInterface):
         path = raw_data["path"]
         name = raw_data["name"]
         size = raw_data["size"]
-        last_modified = raw_data["last_modified"]
+        last_modified_float = raw_data["last_modified"]
+        last_modified = datetime.fromtimestamp(last_modified_float)
         extension = name.split(".")[-1].lower() if "." in name else None
 
         return FileRecord(
