@@ -7,10 +7,7 @@ from datetime import datetime
 from typing import List, Dict
 from domain.interfaces import FileRepositoryInterface
 from infrastructure.drive.drive_client import DriveClient
-from infrastructure.persistence.sqlite_repo import SQLiteFileRepository
-
 logger = logging.getLogger(__name__)
-
 
 class DeletionService:
     def __init__(self, repo: FileRepositoryInterface, drive_client: DriveClient):
@@ -123,14 +120,7 @@ class DeletionService:
         return summary
 
     def _get_drive_records(self):
-        # Using the same logic as ComparisonService to fetch drive records
-        if isinstance(self.repo, SQLiteFileRepository):
-            with self.repo._get_connection() as conn:
-                cursor = conn.execute(
-                    "SELECT source_id, name, size, source, hash, hash_algo, extension, last_modified, status, confidence_score FROM file_records WHERE source = 'drive'"
-                )
-                return [self.repo._row_to_record(row) for row in cursor.fetchall()]
-        return []
+        return self.repo.get_all_by_source("drive")
 
     def _export_report(self, data: List[Dict], path: str):
         if not data:
