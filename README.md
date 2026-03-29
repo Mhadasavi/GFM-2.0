@@ -7,7 +7,7 @@ A robust tool to synchronize, deduplicate, and manage files between local storag
 - **Local Inventory:** Recursively scans local directories and computes content hashes (SHA-256) for image files.
 - **Drive Inventory:** Fetches Google Drive metadata and MD5 checksums incrementally to minimize API calls.
 - **Duplicate Detection (Engine):**
-    - **O(n) Comparison:** High-speed lookup using memory-efficient dictionaries.
+    - **O(n) Comparison:** High-speed lookup using PostgreSQL indexed queries.
     - **Status Tracking:** Automatically marks files as `DUPLICATE`, `UNIQUE`, or `UNVERIFIED`.
 - **Confidence Scoring Engine:**
     - **Defense-in-Depth:** Every potential duplicate is assigned a score (0-100).
@@ -18,8 +18,8 @@ A robust tool to synchronize, deduplicate, and manage files between local storag
         - Filename Match: **5%**
     - **Safety Threshold:** Only files with a score **≥ 90** are marked for deletion.
 - **Auditable Decisions:** Every scoring decision is recorded in `logs/audit.csv` with detailed metadata.
-- **Unverified Files Handling:** Google-native files (Docs, Sheets) or files missing hashes are isolated in a separate `unverified_files` table.
-- **Persistence:** Uses SQLite for primary inventory and duplicate tracking.
+- **Unverified Files Handling:** Google-native files (Docs, Sheets) or files missing hashes are tracked with a specific `UNVERIFIED` status in the main inventory.
+- **Persistence:** Powered by **PostgreSQL** with **SQLAlchemy ORM** for high-performance indexing and data consistency.
 - **Daily Rotating Logs:** Built-in logging with daily rollover and configurable retention.
 - **Dry-Run Deletion (Safety-First):**
     - **Default Mode:** Every deletion command runs in dry-run mode by default.
@@ -29,7 +29,8 @@ A robust tool to synchronize, deduplicate, and manage files between local storag
 
 ## Prerequisites
 
-- **Python 3.8+**
+- **Python 3.12+**
+- **PostgreSQL Instance:** Running locally or via Docker.
 - **Google Cloud Project:** With Drive API enabled and OAuth 2.0 credentials.
 
 ### Getting Google Drive Credentials
@@ -78,7 +79,13 @@ To use the Google Drive features, you must provide a `credentials.json` file:
    pip install -r requirements.txt
    ```
 
-4. **Google Drive Credentials:**
+4. **Set up PostgreSQL:**
+   Ensure you have a PostgreSQL database created. You can use Docker:
+   ```bash
+   docker run --name pg-inventory -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=inventory -p 5432:5432 -d postgres
+   ```
+
+5. **Google Drive Credentials:**
    Place your `credentials.json` in the `credentials/` directory. On the first run, the application will prompt for authentication and save a `token.json`.
 
 ## Configuration
@@ -87,7 +94,7 @@ The application is configured via environment variables. You can set these in yo
 
 | Variable | Description | Default |
 | :--- | :--- | :--- |
-| `SQLITE_DB_PATH` | SQLite database file path | `inventory.db` |
+| `DATABASE_URL` | PostgreSQL connection string | `postgresql://postgres:postgres@localhost:5432/inventory` |
 | `SCAN_DIRECTORY` | Local directory to scan | (See config.py) |
 | `HASH_ALGO` | Hash algorithm for local files | `sha256` |
 | `MAX_WORKERS` | Parallel workers for hashing | `4` |
@@ -108,7 +115,7 @@ python -m app.main local
 ```
 
 ### 2. Scan Google Drive
-Fetches metadata and MD5 checksums for Drive files.
+Fetches metadata and MD5 checksums for Drive files. Populates both `file_records` and `drive_files` tables.
 ```bash
 python -m app.main drive
 ```
@@ -136,6 +143,13 @@ Executes local scan, Drive scan, and duplicate detection sequentially.
 python -m app.main all
 ```
 
+## Database Schema
+
+The application uses three primary tables in PostgreSQL:
+- **`file_records`**: Unified inventory for both local and drive files, used for comparison and status tracking.
+- **`drive_files`**: Detailed cloud-only metadata (MIME type, parents, folder paths).
+- **`scan_state`**: Tracks the timestamp of the last successful synchronization per source.
+
 ## Logging & Auditing
 
 - **App Logs (`logs/app.log`):** Daily rotating system logs for debugging and monitoring. Actions like moving a file to trash are logged with timestamps and file hashes.
@@ -152,7 +166,7 @@ python -m app.main all
 
 - `app/`: Application entry point and configuration.
 - `services/`: Core business logic (Comparison & Confidence Engine).
-- `infrastructure/`: External integrations (Drive, Local FS, SQLite).
+- `infrastructure/`: External integrations (Drive, Local FS, SQLAlchemy/PostgreSQL).
 - `domain/`: Business models, interfaces, and rules.
 - `utils/`: Shared utilities (logging, validation).
 - `logs/`: Automatically created directory for daily logs.

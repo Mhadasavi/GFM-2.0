@@ -137,26 +137,7 @@ class ComparisonService:
             dict_writer.writerows(data)
 
     def _get_records_by_source(self, source: str) -> List[FileRecord]:
-        # Using the same SQL here as it's SQLite specific for now
-        # but the class depends on the interface for DIP compliance
-        from infrastructure.persistence.sqlite_repo import SQLiteFileRepository
-
-        if isinstance(self.repo, SQLiteFileRepository):
-            with self.repo._get_connection() as conn:
-                cursor = conn.execute(
-                    "SELECT source_id, name, size, source, hash, hash_algo, extension, last_modified, status, confidence_score FROM file_records WHERE source = ?",
-                    (source,),
-                )
-                return [self.repo._row_to_record(row) for row in cursor.fetchall()]
-        return []
+        return self.repo.get_all_by_source(source)
 
     def _count_unverified_by_source(self, source: str) -> int:
-        from infrastructure.persistence.sqlite_repo import SQLiteFileRepository
-
-        if isinstance(self.repo, SQLiteFileRepository):
-            with self.repo._get_connection() as conn:
-                cursor = conn.execute(
-                    "SELECT COUNT(*) FROM unverified_files WHERE source = ?", (source,)
-                )
-                return cursor.fetchone()[0]
-        return 0
+        return self.repo.count_unverified_by_source(source)

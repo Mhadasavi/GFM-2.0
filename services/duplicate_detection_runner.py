@@ -1,13 +1,13 @@
 import time
 import logging
-from infrastructure.persistence.sqlite_repo import SQLiteFileRepository
+from domain.interfaces import FileRepositoryInterface
 from services.comparison_service import ComparisonService
 
 logger = logging.getLogger(__name__)
 
 
 class DuplicateDetectionRunner:
-    def __init__(self, repo: SQLiteFileRepository):
+    def __init__(self, repo: FileRepositoryInterface):
         self.repo = repo
         self.comparison_service = ComparisonService(repo)
 
