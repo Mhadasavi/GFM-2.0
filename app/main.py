@@ -1,6 +1,12 @@
 import os
 import sys
 import logging
+
+from dotenv import load_dotenv
+
+# Load .env before importing Config to ensure it picks up the environment variables
+load_dotenv(override=True)
+
 from app.config import Config
 from infrastructure.local.local_scanner import LocalScanner
 from infrastructure.normalization.local_normalizer import LocalNormalizer
@@ -46,9 +52,13 @@ def run_drive_inventory(config, logger):
     logger.info("Starting drive inventory run...")
     file_repo = SQLiteFileRepository(config.SQLITE_DB_PATH)
 
-    drive_client = DriveClient(
-        credentials_path=config.CREDENTIALS_PATH, token_path=config.TOKEN_PATH
-    )
+    try:
+        drive_client = DriveClient(
+            credentials_path=config.CREDENTIALS_PATH, token_path=config.TOKEN_PATH
+        )
+    except FileNotFoundError as e:
+        print(f"\n[ERROR] {e}")
+        return
 
     scanner = DriveScanner(drive_client)
     normalizer = DriveNormalizer()
@@ -73,6 +83,30 @@ def run_deletion(config, logger, dry_run=True):
     drive_client = DriveClient(
         credentials_path=config.CREDENTIALS_PATH, token_path=config.TOKEN_PATH
     )
+
+    service = DeletionService(file_repo, drive_client)
+    summary = service.run_deletion(dry_run=dry_run)
+
+    logger.info(f"Deletion flow completed. Summary: {summary}")
+    if dry_run:
+        print("\n[DRY RUN] Report generated at logs/deletion_report.csv")
+        print(f"[DRY RUN] Proposed deletions: {summary['proposed_deletions']}")
+    else:
+        print("\n[FORCE DELETE] Action completed.")
+        print(f"[FORCE DELETE] Files deleted: {summary['actual_deletions']}")
+
+
+def run_deletion(config, logger, dry_run=True):
+    logger.info(f"Initiating deletion flow (dry_run={dry_run})...")
+    file_repo = SQLiteFileRepository(config.SQLITE_DB_PATH)
+
+    try:
+        drive_client = DriveClient(
+            credentials_path=config.CREDENTIALS_PATH, token_path=config.TOKEN_PATH
+        )
+    except FileNotFoundError as e:
+        print(f"\n[ERROR] {e}")
+        return
 
     service = DeletionService(file_repo, drive_client)
     summary = service.run_deletion(dry_run=dry_run)

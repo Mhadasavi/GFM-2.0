@@ -21,11 +21,43 @@ A robust tool to synchronize, deduplicate, and manage files between local storag
 - **Unverified Files Handling:** Google-native files (Docs, Sheets) or files missing hashes are isolated in a separate `unverified_files` table.
 - **Persistence:** Uses SQLite for primary inventory and duplicate tracking.
 - **Daily Rotating Logs:** Built-in logging with daily rollover and configurable retention.
+- **Dry-Run Deletion (Safety-First):**
+    - **Default Mode:** Every deletion command runs in dry-run mode by default.
+    - **Move to Trash:** Files are moved to the Google Drive Trash (not permanently deleted), allowing for easy recovery.
+    - **Rate-Limited API:** Built-in delays to respect Google Drive API quotas.
+    - **Detailed Action Reports:** Generates a `logs/deletion_report.csv` with the final status of every file.
 
 ## Prerequisites
 
 - **Python 3.8+**
 - **Google Cloud Project:** With Drive API enabled and OAuth 2.0 credentials.
+
+### Getting Google Drive Credentials
+
+To use the Google Drive features, you must provide a `credentials.json` file:
+
+1.  **Go to the [Google Cloud Console](https://console.cloud.google.com/).**
+2.  **Create a New Project** (or select an existing one).
+3.  **Enable the Drive API:**
+    - Go to **APIs & Services > Library**.
+    - Search for "Google Drive API" and click **Enable**.
+4.  **Configure OAuth Consent Screen:**
+    - Go to **APIs & Services > OAuth consent screen**.
+    - Select **External** (or Internal if you have a Workspace) and click **Create**.
+    - Fill in the required app information (App name, User support email, Developer contact info).
+    - Add the scope: `.../auth/drive` (or simply `https://www.googleapis.com/auth/drive`).
+    - Add your email to **Test users** (CRITICAL: while in "Testing" mode, only these users can log in).
+5.  **Create Credentials:**
+    - Go to **APIs & Services > Credentials**.
+    - Click **+ CREATE CREDENTIALS** and select **OAuth client ID**.
+    - Set **Application type** to **Desktop app**.
+    - Give it a name (e.g., "GFM 2.0") and click **Create**.
+6.  **Download JSON:**
+    - Find your new credential under **OAuth 2.0 Client IDs**.
+    - Click the **Download JSON** icon (down arrow) on the right.
+    - Rename the downloaded file to `credentials.json`.
+7.  **Place the file:**
+    - Move `credentials.json` into the `credentials/` directory of this project.
 
 ## Installation
 
@@ -86,7 +118,19 @@ python -m app.main drive
 python -m app.main compare
 ```
 
-### 4. Run All Steps
+### 4. Delete Verified Duplicates (Safety Mode)
+Generates a report of files marked for deletion. Moves files to trash only with `--force`.
+```bash
+python -m app.main delete
+```
+
+### 5. Execute Deletion (Permanent Action)
+Moves all verified duplicates (score ≥ 90) to the Google Drive Trash.
+```bash
+python -m app.main delete --force
+```
+
+### 6. Run All Steps
 Executes local scan, Drive scan, and duplicate detection sequentially.
 ```bash
 python -m app.main all
@@ -94,8 +138,9 @@ python -m app.main all
 
 ## Logging & Auditing
 
-- **App Logs (`logs/app.log`):** Daily rotating system logs for debugging and monitoring.
+- **App Logs (`logs/app.log`):** Daily rotating system logs for debugging and monitoring. Actions like moving a file to trash are logged with timestamps and file hashes.
 - **Audit Logs (`logs/audit.csv`):** Permanent record of every duplicate decision, including the specific confidence score and hash.
+- **Deletion Reports (`logs/deletion_report.csv`):** Detailed CSV generated after every deletion run (dry-run or force). Includes Drive ID, Name, Score, Hash, and Final Status (e.g., `TRASHED_SUCCESS`, `SKIPPED_DRY_RUN`).
 
 ## Safety Rules (Confidence Engine)
 

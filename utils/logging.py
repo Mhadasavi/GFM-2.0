@@ -5,10 +5,11 @@ from app.config import Config
 
 
 def get_logger(name):
-    logger = logging.getLogger(name)
-    logger.setLevel(logging.DEBUG)
+    # Configure root logger to ensure all child loggers inherit settings
+    root_logger = logging.getLogger()
+    root_logger.setLevel(logging.DEBUG)
 
-    if not logger.handlers:
+    if not root_logger.handlers:
         config = Config()
         log_path = config.LOG_PATH
 
@@ -25,10 +26,9 @@ def get_logger(name):
         ch = logging.StreamHandler()
         ch.setLevel(logging.DEBUG)
         ch.setFormatter(formatter)
-        logger.addHandler(ch)
+        root_logger.addHandler(ch)
 
         # File Handler (Timed Rotating) - Daily rotation
-        # backupCount=0 means no old log files are deleted (keeps them forever)
         backup_count = config.LOG_RETENTION_DAYS if config.DELETE_OLD_LOGS else 0
 
         try:
@@ -41,8 +41,8 @@ def get_logger(name):
             )
             fh.setLevel(logging.DEBUG)
             fh.setFormatter(formatter)
-            logger.addHandler(fh)
+            root_logger.addHandler(fh)
         except Exception as e:
             print(f"Failed to setup file logging: {e}")
 
-    return logger
+    return logging.getLogger(name)
