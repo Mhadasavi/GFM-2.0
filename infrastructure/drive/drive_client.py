@@ -15,8 +15,9 @@ logger = logging.getLogger(__name__)
 
 class DriveClient:
     def __init__(self, credentials_path: str, token_path: str):
-        self.credentials_path = credentials_path
-        self.token_path = token_path
+        # Normalize paths to absolute to avoid issues with relative path resolution
+        self.credentials_path = os.path.abspath(credentials_path)
+        self.token_path = os.path.abspath(token_path)
         self.service = self._authenticate()
 
     def _authenticate(self):
@@ -34,9 +35,14 @@ class DriveClient:
                         f"Drive credentials not found at: {self.credentials_path}\n"
                         "Please place your Google Cloud 'credentials.json' file in the "
                         f"'{os.path.dirname(self.credentials_path)}' directory.\n"
+                        "Current Working Directory: " + os.getcwd() + "\n"
                         "Refer to the README.md for setup instructions."
                     )
-                    logger.error(json.dumps({"event": "drive_credentials_missing", "path": self.credentials_path}))
+                    logger.error(json.dumps({
+                        "event": "drive_credentials_missing",
+                        "checked_path": self.credentials_path,
+                        "cwd": os.getcwd()
+                    }))
                     raise FileNotFoundError(error_msg)
 
                 flow = InstalledAppFlow.from_client_secrets_file(
@@ -80,9 +86,16 @@ class DriveClient:
         )
 
         page_token = None
+        page_count = 0
 
         while True:
             try:
+                page_count += 1
+                logger.info(
+                    json.dumps(
+                        {"event": "drive_fetching_page", "page_number": page_count}
+                    )
+                )
                 response = (
                     self.service.files()
                     .list(

@@ -1,6 +1,12 @@
 import os
 import sys
 import logging
+
+from dotenv import load_dotenv
+
+# Load .env before importing Config to ensure it picks up the environment variables
+load_dotenv(override=True)
+
 from app.config import Config
 from infrastructure.local.local_scanner import LocalScanner
 from infrastructure.normalization.local_normalizer import LocalNormalizer

@@ -26,10 +26,21 @@ class DriveInventoryRunner:
     def run(self, source_path: str = None):
         start_time = time.time()
         count = 0
+        logger.info(json.dumps({"event": "drive_inventory_run_started"}))
         for raw_data in self.scanner.scan(source_path):
             record = self.normalizer.normalize(raw_data)
             self.file_repo.upsert(record)
             count += 1
+            if count % 1000 == 0:
+                logger.info(
+                    json.dumps(
+                        {
+                            "event": "drive_inventory_progress",
+                            "records_processed": count,
+                            "elapsed_sec": round(time.time() - start_time, 2),
+                        }
+                    )
+                )
 
         if self.state_repo:
             now = int(time.time())
