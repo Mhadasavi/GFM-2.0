@@ -13,21 +13,26 @@ class FileRecord(Base):
 
     # Use a surrogate ID for primary key, but keep source_id unique
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-    source_id: Mapped[str] = mapped_column(String, unique=True, index=True)  # Path for local, Drive ID for drive
+    source_id: Mapped[str] = mapped_column(
+        String, unique=True, index=True
+    )  # Path for local, Drive ID for drive
     name: Mapped[str] = mapped_column(String)
     size: Mapped[int] = mapped_column(BigInteger, index=True)
     source: Mapped[str] = mapped_column(String, index=True)  # 'local' or 'drive'
     hash: Mapped[Optional[str]] = mapped_column(String, index=True)
     hash_algo: Mapped[Optional[str]] = mapped_column(String)
     extension: Mapped[Optional[str]] = mapped_column(String)
+    mime_type: Mapped[Optional[str]] = mapped_column(String)
     last_modified: Mapped[Optional[datetime]] = mapped_column(DateTime)
-    status: Mapped[Optional[str]] = mapped_column(String, index=True, nullable=True)  # 'DUPLICATE', 'UNIQUE', 'UNVERIFIED'
-    confidence_score: Mapped[int] = mapped_column(Integer, default=0, server_default="0", nullable=False)
+    status: Mapped[Optional[str]] = mapped_column(
+        String, index=True, nullable=True
+    )  # 'DUPLICATE', 'UNIQUE', 'UNVERIFIED'
+    confidence_score: Mapped[int] = mapped_column(
+        Integer, default=0, server_default="0", nullable=False
+    )
 
     # Composite index for size and hash as used in Mongo
-    __table_args__ = (
-        Index("ix_file_records_size_hash", "size", "hash"),
-    )
+    __table_args__ = (Index("ix_file_records_size_hash", "size", "hash"),)
 
     def to_dict(self):
         return {
@@ -38,7 +43,10 @@ class FileRecord(Base):
             "hash": self.hash,
             "hash_algo": self.hash_algo,
             "extension": self.extension,
-            "last_modified": self.last_modified.isoformat() if self.last_modified else None,
+            "mime_type": self.mime_type,
+            "last_modified": (
+                self.last_modified.isoformat() if self.last_modified else None
+            ),
             "status": self.status,
             "confidence_score": self.confidence_score,
         }
@@ -58,9 +66,7 @@ class DriveFile(Base):
     parent_id: Mapped[Optional[str]] = mapped_column(String)
     path: Mapped[Optional[str]] = mapped_column(String)
 
-    __table_args__ = (
-        Index("ix_drive_files_size_hash", "size", "hash"),
-    )
+    __table_args__ = (Index("ix_drive_files_size_hash", "size", "hash"),)
 
 
 class ScanState(Base):

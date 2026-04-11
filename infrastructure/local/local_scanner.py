@@ -17,16 +17,16 @@ class LocalScanner(ScannerInterface):
         for root, _, files in os.walk(dir_path):
             for file in files:
                 extension = file.split(".")[-1].lower()
-                if extension in self.supported_extensions:
-                    path = os.path.abspath(os.path.join(root, file))
-                    try:
-                        stat = os.stat(path)
-                        yield {
-                            "path": path,
-                            "name": file,
-                            "size": stat.st_size,
-                            "last_modified": stat.st_mtime,
-                        }
-                    except (OSError, PermissionError) as e:
-                        # Log error if needed
-                        continue
+                # if extension in self.supported_extensions:
+                path = os.path.abspath(os.path.join(root, file))
+                try:
+                    stat = os.stat(path)
+                    yield {
+                        "path": path,
+                        "name": file,
+                        "size": stat.st_size,
+                        "last_modified": stat.st_mtime,
+                    }
+                except (OSError, PermissionError) as e:
+                    # Log error if needed
+                    continue
