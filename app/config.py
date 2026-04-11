@@ -6,11 +6,12 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 class Config:
     DATABASE_URL = os.environ.get(
-        "DATABASE_URL",
-        "postgresql://postgres:postgres@localhost:5432/inventory"
+        "DATABASE_URL", "postgresql://postgres:postgres@localhost:5432/inventory"
     )
-    SCAN_DIRECTORY = os.environ.get("SCAN_DIRECTORY", "D:\\Pics & Videos\\Whatsapp\\whatsapp images\\2017")
-    HASH_ALGO = os.environ.get("HASH_ALGO", "sha256")
+    SCAN_DIRECTORY = os.environ.get(
+        "SCAN_DIRECTORY", "D:\\study\\Repo\\Resources\\test data"
+    )
+    HASH_ALGO = os.environ.get("HASH_ALGO", "md5")
     MAX_WORKERS = int(os.environ.get("MAX_WORKERS", 4))
     CREDENTIALS_PATH = os.path.abspath(
         os.path.join(

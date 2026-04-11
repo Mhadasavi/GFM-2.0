@@ -5,7 +5,7 @@ from domain.interfaces import (
     ScannerInterface,
     NormalizerInterface,
     FileRepositoryInterface,
-    DriveRepositoryInterface
+    DriveRepositoryInterface,
 )
 
 logger = logging.getLogger(__name__)
@@ -26,20 +26,26 @@ class DriveInventoryRunner:
         self.drive_repo = drive_repo
         self.state_repo = state_repo
 
-    def run(self, source_path: str = None):
+    def run(self, source_path: str = None, limit: int = None):
         start_time = time.time()
         count = 0
-        logger.info(json.dumps({"event": "drive_inventory_run_started"}))
+        logger.info(
+            json.dumps({"event": "drive_inventory_run_started", "limit": limit})
+        )
         for raw_data in self.scanner.scan(source_path):
+            if limit and count >= limit:
+                logger.info(f"Reached scan limit of {limit}. Stopping.")
+                break
+
             # 1. Update basic comparison inventory (file_records table)
             record = self.normalizer.normalize(raw_data)
             self.file_repo.upsert(record)
-            
+
             # 2. Update cloud-specific inventory (drive_files table)
             if hasattr(self.normalizer, "to_drive_file"):
                 drive_file_meta = self.normalizer.to_drive_file(raw_data)
                 self.drive_repo.upsert(drive_file_meta)
-            
+
             count += 1
             if count % 1000 == 0:
                 logger.info(
