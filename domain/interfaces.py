@@ -5,7 +5,7 @@ from domain.models import FileRecord, DriveFile
 
 class HashingServiceInterface(ABC):
     @abstractmethod
-    def stream_hash(self, file_path: str, algorithm: str = "sha256") -> str:
+    def stream_hash(self, file_path: str, algorithm: str) -> str:
         pass
 
 

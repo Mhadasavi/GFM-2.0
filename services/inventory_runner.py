@@ -1,6 +1,7 @@
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import List, Optional
+from app.config import Config
 from domain.interfaces import (
     ScannerInterface,
     HashingServiceInterface,
@@ -22,8 +23,8 @@ class InventoryRunner:
         hashing_service: HashingServiceInterface,
         file_repo: FileRepositoryInterface,
         state_repo: Optional[ScanStateRepositoryInterface] = None,
-        max_workers: int = 4,
-        hash_algo: str = "sha256",
+        max_workers: int = Config.MAX_WORKERS,
+        hash_algo: str = Config.HASH_ALGO,
     ):
         self.scanner = scanner
         self.normalizer = normalizer

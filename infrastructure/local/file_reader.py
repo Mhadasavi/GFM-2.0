@@ -3,7 +3,7 @@ import hashlib
 CHUNK_SIZE = 1024 * 1024  # 1MB
 
 
-def stream_hash(file_path: str, algo: str = "sha256") -> str:
+def stream_hash(file_path: str, algo: str) -> str:
     hasher = hashlib.new(algo)
 
     with open(file_path, "rb") as f:

@@ -42,8 +42,6 @@ def run_local_inventory(config, logger, file_repo, state_repo, limit=None):
         hashing_service=hashing_service,
         file_repo=file_repo,
         state_repo=state_repo,
-        max_workers=config.MAX_WORKERS,
-        hash_algo=config.HASH_ALGO,
     )
 
     scan_path = config.SCAN_DIRECTORY
